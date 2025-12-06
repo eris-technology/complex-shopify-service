@@ -1,0 +1,394 @@
+openapi: 3.0.0
+info:
+  title: Complex Shopify Service API
+  description: Wishlist service for Shopify POS extensions and mobile app
+  version: 1.0.0
+  contact:
+    name: Complex Team
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+
+tags:
+  - name: Wishlist
+    description: General wishlist operations
+  - name: POS
+    description: POS extension endpoints
+  - name: Mobile
+    description: Mobile app endpoints
+  - name: Products
+    description: Product catalog endpoints
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                  service:
+                    type: string
+
+  /api/wishlists:
+    post:
+      summary: Create a new wishlist
+      tags: [Wishlist]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - items
+              properties:
+                user_id:
+                  type: string
+                  description: Salesforce user ID
+                source:
+                  type: string
+                  enum: [KIOSK, MOBILE_APP]
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/WishlistItemInput'
+                metadata:
+                  type: object
+      responses:
+        '201':
+          description: Wishlist created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WishlistResponse'
+
+    get:
+      summary: Search wishlists
+      tags: [Wishlist]
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of wishlists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wishlists:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Wishlist'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+  /api/pos/wishlists/{wishlistId}/fetch:
+    post:
+      summary: Fetch wishlist for POS processing
+      tags: [POS]
+      security:
+        - PosSecret: []
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - qr_token
+              properties:
+                qr_token:
+                  type: string
+      responses:
+        '200':
+          description: Wishlist ready for processing
+
+  /api/mobile/wishlists:
+    get:
+      summary: Get my wishlists
+      tags: [Mobile]
+      security:
+        - JwtAuth: []
+      responses:
+        '200':
+          description: List of user's wishlists
+
+  /api/products:
+    get:
+      summary: Get products from Shopify
+      tags: [Products]
+      description: |
+        Fetch products from Shopify with optional collection filtering.
+        Results are cached to avoid rate limits.
+        Collection access can be restricted via SHOPIFY_COLLECTIONS_WHITELIST env var.
+      parameters:
+        - name: collection
+          in: query
+          schema:
+            type: string
+          description: Filter by collection handle (e.g., 'popup', 'kiosk')
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 250
+          description: Number of products to return
+        - name: after
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor for next page
+      responses:
+        '200':
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ShopifyProduct'
+                  pageInfo:
+                    type: object
+                    properties:
+                      hasNextPage:
+                        type: boolean
+                      endCursor:
+                        type: string
+        '403':
+          description: Collection not allowed (whitelist enabled)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Collection not allowed
+                  message:
+                    type: string
+                  allowedCollections:
+                    type: array
+                    items:
+                      type: string
+        '500':
+          description: Shopify API error
+
+  /api/products/{productId}:
+    get:
+      summary: Get single product by ID
+      tags: [Products]
+      description: Fetch a single product from Shopify by ID. Results are cached.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Product ID (numeric or GID format)
+          example: gid://shopify/Product/1234567890
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product:
+                    $ref: '#/components/schemas/ShopifyProduct'
+        '404':
+          description: Product not found
+        '500':
+          description: Shopify API error
+
+components:
+  securitySchemes:
+    PosSecret:
+      type: apiKey
+      in: header
+      name: X-POS-Secret
+    JwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    WishlistItemInput:
+      type: object
+      required:
+        - variant_id
+        - product_title
+      properties:
+        variant_id:
+          type: string
+        product_id:
+          type: string
+        quantity:
+          type: integer
+          default: 1
+        product_title:
+          type: string
+        variant_title:
+          type: string
+        price:
+          type: number
+        currency:
+          type: string
+          default: HKD
+        barcode:
+          type: string
+        image_url:
+          type: string
+
+    Wishlist:
+      type: object
+      properties:
+        wishlist_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, PROCESSING, COMPLETED, CANCELLED, EXPIRED]
+        source:
+          type: string
+          enum: [KIOSK, MOBILE_APP]
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    WishlistResponse:
+      type: object
+      properties:
+        wishlist:
+          $ref: '#/components/schemas/Wishlist'
+        qr_code_token:
+          type: string
+
+    ShopifyProduct:
+      type: object
+      properties:
+        node:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Product GID
+              example: gid://shopify/Product/1234567890
+            title:
+              type: string
+            handle:
+              type: string
+            description:
+              type: string
+            tags:
+              type: array
+              items:
+                type: string
+            productType:
+              type: string
+            vendor:
+              type: string
+            status:
+              type: string
+              enum: [ACTIVE, ARCHIVED, DRAFT]
+            images:
+              type: object
+              properties:
+                edges:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      node:
+                        type: object
+                        properties:
+                          url:
+                            type: string
+                          altText:
+                            type: string
+            variants:
+              type: object
+              properties:
+                edges:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      node:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          title:
+                            type: string
+                          sku:
+                            type: string
+                          barcode:
+                            type: string
+                          price:
+                            type: string
+                          compareAtPrice:
+                            type: string
+                          availableForSale:
+                            type: boolean
+                          inventoryQuantity:
+                            type: integer
+                          image:
+                            type: object
+                            properties:
+                              url:
+                                type: string
+                              altText:
+                                type: string
+        cursor:
+          type: string
+          description: Pagination cursor
