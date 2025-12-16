@@ -6,10 +6,6 @@ info:
   contact:
     name: Complex Team
 
-servers:
-  - url: http://localhost:3000
-    description: Development server
-
 tags:
   - name: Wishlist
     description: General wishlist operations
