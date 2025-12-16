@@ -1,0 +1,149 @@
+{
+  "family": "complex-shopify-service-ci-1",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::677276100051:role/complex-ecs-task-execution-role-ci",
+  "taskRoleArn": "arn:aws:iam::677276100051:role/complex-shopify-service-task-role-ci",
+  "containerDefinitions": [
+    {
+      "name": "complex-shopify-service",
+      "image": "ghcr.io/eris-technology/complex-shopify-service:latest",
+      "repositoryCredentials": {
+        "credentialsParameter": "arn:aws:secretsmanager:ap-east-1:677276100051:secret:ci/complex/github-registry/image_registry-ZORygr"
+      },
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "PORT",
+          "value": "3000"
+        },
+        {
+          "name": "NODE_ENV",
+          "value": "integration"
+        },
+        {
+          "name": "AUTHORIZE_DB_MODIFICATIONS",
+          "value": "false"
+        },
+        {
+          "name": "DB_DIALECT",
+          "value": "postgres"
+        },
+        {
+          "name": "DB_SSL",
+          "value": "false"
+        },
+        {
+          "name": "DB_LOGGING",
+          "value": "false"
+        },
+        {
+          "name": "DB_POOL_MIN",
+          "value": "2"
+        },
+        {
+          "name": "DB_POOL_MAX",
+          "value": "10"
+        },
+        {
+          "name": "CACHE_MODE",
+          "value": "redis"
+        },
+        {
+          "name": "REDIS_URL",
+          "value": "redis://master.complex-redis-ci.irrslj.ape1.cache.amazonaws.com:6379"
+        },
+        {
+          "name": "WISHLIST_EXPIRATION_HOURS",
+          "value": "24"
+        },
+        {
+          "name": "MAX_ITEMS_PER_WISHLIST",
+          "value": "50"
+        },
+        {
+          "name": "USER_SERVICE_URL",
+          "value": "http://user-service.complex-ci.local:3001"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DB_HOST",
+          "valueFrom": "arn:aws:secretsmanager:ap-east-1:677276100051:secret:ci/complex/database/complex_shopify:host::"
+        },
+        {
+          "name": "DB_PORT",
+          "valueFrom": "arn:aws:secretsmanager:ap-east-1:677276100051:secret:ci/complex/database/complex_shopify:port::"
+        },
+        {
+          "name": "DB_USER",
+          "valueFrom": "arn:aws:secretsmanager:ap-east-1:677276100051:secret:ci/complex/database/complex_shopify:username::"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:ap-east-1:677276100051:secret:ci/complex/database/complex_shopify:password::"
+        },
+        {
+          "name": "DB_NAME",
+          "valueFrom": "arn:aws:secretsmanager:ap-east-1:677276100051:secret:ci/complex/database/complex_shopify:dbname::"
+        },
+        {
+          "name": "SHOPIFY_SHOP_DOMAIN",
+          "valueFrom": "arn:aws:secretsmanager:ap-east-1:677276100051:secret:ci/complex/application/shopify_api_credentials:shop_domain::"
+        },
+        {
+          "name": "SHOPIFY_ACCESS_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:ap-east-1:677276100051:secret:ci/complex/application/shopify_api_credentials:access_token::"
+        },
+        {
+          "name": "SHOPIFY_API_VERSION",
+          "valueFrom": "arn:aws:secretsmanager:ap-east-1:677276100051:secret:ci/complex/application/shopify_api_credentials:api_version::"
+        },
+        {
+          "name": "POS_SECRET_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:ap-east-1:677276100051:secret:ci/complex/application/shopify_pos_secret-gVaTPa::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/aws/ecs/complex-ci/shopify-service",
+          "awslogs-region": "ap-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:3000/health || exit 1"
+        ],
+        "interval": 15,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      }
+    }
+  ],
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "ci"
+    },
+    {
+      "key": "Service",
+      "value": "shopify-service"
+    },
+    {
+      "key": "Project",
+      "value": "complex"
+    }
+  ]
+}

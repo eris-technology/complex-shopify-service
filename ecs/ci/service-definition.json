@@ -1,0 +1,54 @@
+{
+  "serviceName": "complex-shopify-service-ci",
+  "cluster": "complex-cluster-ci",
+  "taskDefinition": "complex-shopify-service-ci",
+  "desiredCount": 1,
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-0fb2dfc6466bf7fc1"],
+      "securityGroups": ["sg-00f5b35c234e43b35"],
+      "assignPublicIp": "DISABLED"
+    }
+  },
+  "serviceRegistries": [
+    {
+      "registryArn": "arn:aws:servicediscovery:ap-east-1:677276100051:service/srv-mxttyucypbmgri23",
+      "containerName": "complex-shopify-service"
+    }
+  ],
+  "capacityProviderStrategy": [
+  {
+    "capacityProvider": "FARGATE_SPOT",
+    "weight": 1
+  }
+  ],
+  "loadBalancers": [
+    { 
+      "targetGroupArn": "arn:aws:elasticloadbalancing:ap-east-1:677276100051:targetgroup/complex-shopify-service-tg-ci/a2407d8d89a8f540",
+      "containerName": "complex-shopify-service",
+      "containerPort": 3000
+    }
+  ],
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 50,
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": true
+    }
+  },
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "ci"
+    },
+    {
+      "key": "Service",
+      "value": "shopify-service"
+    },
+    {
+      "key": "Project",
+      "value": "complex"
+    }
+  ]
+}

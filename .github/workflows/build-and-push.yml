@@ -1,0 +1,126 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [main, development]
+    tags:
+      - "v*"
+    paths-ignore:
+      - "ecs/**"
+      - "*.md"
+      - ".github/workflows/deploy-*.yml"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "ecs/**"
+      - "*.md"
+      - ".github/workflows/deploy-*.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  actions: read
+  id-token: write
+
+jobs:
+  # Only run on PRs for validation
+  validate-pr:
+    name: Validate PR Changes
+    runs-on: ubuntu-latest
+    environment: ci
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Configure Git for private packages
+        run: |
+          echo "Setting up Git authentication for private repositories..."
+          git config --global url."https://${{ secrets.COMMON_UTILS_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+
+      - name: Install dependencies
+        run: npm install
+
+  build-and-push:
+    name: Build and Push to GitHub Registry
+    runs-on: ubuntu-latest
+    environment: ci
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          # Generate image tag based on git info
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TAG="pr-${{ github.event.number }}-$(git rev-parse --short ${{ github.sha }})"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            # For git tags, use the tag name (e.g., v1.2.3)
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="$(git rev-parse --short ${{ github.sha }})"
+          fi
+
+          # Convert repository name to lowercase for GHCR
+          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+
+          echo "IMAGE_TAG=$TAG" >> $GITHUB_OUTPUT
+          echo "IMAGE_URI=ghcr.io/$REPO_NAME:$TAG" >> $GITHUB_OUTPUT
+          echo "LATEST_URI=ghcr.io/$REPO_NAME:latest" >> $GITHUB_OUTPUT
+
+          echo "🏷️ Building image with tag: $TAG"
+
+      - name: Build Docker image
+        run: |
+          echo "🐳 Building Docker image for GitHub Registry..."
+          docker build \
+            --build-arg GITHUB_TOKEN=${{ secrets.COMMON_UTILS_TOKEN }} \
+            -t ${{ steps.meta.outputs.IMAGE_URI }} .
+          docker tag ${{ steps.meta.outputs.IMAGE_URI }} ${{ steps.meta.outputs.LATEST_URI }}
+
+      - name: Run security scan
+        run: |
+          echo "🔍 Running basic security checks..."
+          # Check for common vulnerabilities in package.json
+          if command -v npm &> /dev/null; then
+            npm audit --audit-level=moderate || echo "⚠️ Audit completed with warnings"
+          fi
+
+      - name: Push Docker image to GHCR
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development' || github.ref_type == 'tag')
+        run: |
+          echo "📦 Pushing image to GitHub Container Registry..."
+          docker push ${{ steps.meta.outputs.IMAGE_URI }}
+
+          # Only push latest tag for main branch, not for version tags or development
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            docker push ${{ steps.meta.outputs.LATEST_URI }}
+            echo "✅ Successfully pushed to GHCR:"
+            echo "  - ${{ steps.meta.outputs.IMAGE_URI }}"
+            echo "  - ${{ steps.meta.outputs.LATEST_URI }}"
+          else
+            echo "✅ Successfully pushed to GHCR:"
+            echo "  - ${{ steps.meta.outputs.IMAGE_URI }}"
+            if [ "${{ github.ref }}" = "refs/heads/development" ]; then
+              echo "ℹ️ Development branch - latest tag not updated"
+            else
+              echo "ℹ️ Latest tag not updated for version releases"
+            fi
+          fi

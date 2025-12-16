@@ -1,0 +1,92 @@
+name: Deploy to Staging Client Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy (default: latest)"
+        required: false
+        default: "latest"
+        type: string
+      force_deployment:
+        description: "Force deployment even if image is the same"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy to ECS stg
+    runs-on: ubuntu-latest
+    environment: stg
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Prepare deployment
+        id: prepare
+        run: |
+          IMAGE_TAG="${{ inputs.image_tag || 'latest' }}"
+          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          FULL_IMAGE_URI="ghcr.io/$REPO_NAME:$IMAGE_TAG"
+
+          echo "IMAGE_URI=$FULL_IMAGE_URI" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+          echo "🚀 Manual deployment of image: $FULL_IMAGE_URI"
+
+      - name: Verify image exists in GHCR
+        id: verify-image
+        run: |
+          echo "🔍 Verifying image exists in GitHub Container Registry..."
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          if docker manifest inspect ${{ steps.prepare.outputs.IMAGE_URI }} >/dev/null 2>&1; then
+            echo "✅ Image ${{ steps.prepare.outputs.IMAGE_TAG }} found in GHCR"
+            echo "FINAL_IMAGE_URI=${{ steps.prepare.outputs.IMAGE_URI }}" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Image not found in GHCR: ${{ steps.prepare.outputs.IMAGE_URI }}"
+            exit 1
+          fi
+
+      - name: Update task definition
+        id: task-def
+        run: |
+          echo "📝 Updating task definition with new image..."
+          cp ecs/stg/task-definition.json task-definition-updated.json
+
+          jq --arg IMAGE_URI "${{ steps.verify-image.outputs.FINAL_IMAGE_URI }}" \
+            '.containerDefinitions[0].image = $IMAGE_URI' \
+            task-definition-updated.json > task-definition-final.json
+
+      - name: Register new task definition
+        id: register-task-def
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://task-definition-final.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "TASK_DEFINITION_ARN=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Deploy ECS service
+        run: |
+          chmod +x ./ecs/scripts/deploy-service.sh 
+          ./ecs/scripts/deploy-service.sh stg "${{ steps.register-task-def.outputs.TASK_DEFINITION_ARN }}"
+
+      - name: Verify deployment
+        run: |
+          echo "🎉 Deployment to stg environment completed successfully!"

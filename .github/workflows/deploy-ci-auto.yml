@@ -1,0 +1,179 @@
+name: Deploy to CI Environment
+
+on:
+  # Automatically deploy after successful build
+  workflow_run:
+    workflows: ["Build and Push Docker Image"]
+    types:
+      - completed
+    branches: [main, development]
+
+  # Manual deployment option (commented out - uncomment to re-enable)
+  # workflow_dispatch:
+  #   inputs:
+  #     image_tag:
+  #       description: "Docker image tag to deploy (default: latest)"
+  #       required: false
+  #       default: "latest"
+  #       type: string
+  #     force_deployment:
+  #       description: "Force deployment even if image is the same"
+  #       required: false
+  #       default: false
+  #       type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy to ECS CI
+    runs-on: ubuntu-latest
+    environment: ci
+    # Only run if the build workflow completed successfully
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Prepare deployment
+        id: prepare
+        run: |
+          # For automatic deployment, use the commit SHA from the triggering workflow
+          IMAGE_TAG="$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)"
+
+          # Use GitHub Container Registry (matching build workflow naming)
+          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+
+          # Try specific tag first, fallback to latest if not found
+          FULL_IMAGE_URI="ghcr.io/$REPO_NAME:$IMAGE_TAG"
+          FALLBACK_IMAGE_URI="ghcr.io/$REPO_NAME:latest"
+
+          echo "IMAGE_URI=$FULL_IMAGE_URI" >> $GITHUB_OUTPUT
+          echo "FALLBACK_IMAGE_URI=$FALLBACK_IMAGE_URI" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+          echo "🚀 Auto-deploying image from successful build: $FULL_IMAGE_URI"
+          echo "📋 Fallback image available: $FALLBACK_IMAGE_URI"
+
+      - name: Verify image exists in GHCR
+        id: verify-image
+        run: |
+          echo "🔍 Verifying image exists in GitHub Container Registry..."
+
+          # Login to GHCR to verify image exists
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          if docker manifest inspect ${{ steps.prepare.outputs.IMAGE_URI }} >/dev/null 2>&1; then
+            echo "✅ Image ${{ steps.prepare.outputs.IMAGE_TAG }} found in GHCR"
+            echo "FINAL_IMAGE_URI=${{ steps.prepare.outputs.IMAGE_URI }}" >> $GITHUB_OUTPUT
+          elif docker manifest inspect ${{ steps.prepare.outputs.FALLBACK_IMAGE_URI }} >/dev/null 2>&1; then
+            echo "⚠️ Specific tag not found, using fallback latest image"
+            echo "✅ Fallback image found: ${{ steps.prepare.outputs.FALLBACK_IMAGE_URI }}"
+            echo "FINAL_IMAGE_URI=${{ steps.prepare.outputs.FALLBACK_IMAGE_URI }}" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Neither specific tag nor latest image found in GHCR"
+            echo "Tried: ${{ steps.prepare.outputs.IMAGE_URI }}"
+            echo "Tried: ${{ steps.prepare.outputs.FALLBACK_IMAGE_URI }}"
+            exit 1
+          fi
+
+      - name: Update task definition
+        id: task-def
+        run: |
+          echo "📝 Updating task definition with new image..."
+
+          # Read the base task definition
+          cp ecs/ci/task-definition.json task-definition-updated.json
+
+          # Update the image URI in the task definition
+          jq --arg IMAGE_URI "${{ steps.verify-image.outputs.FINAL_IMAGE_URI }}" \
+            '.containerDefinitions[0].image = $IMAGE_URI' \
+            task-definition-updated.json > task-definition-final.json
+
+          echo "✅ Task definition updated with image: ${{ steps.verify-image.outputs.FINAL_IMAGE_URI }}"
+
+      - name: Register new task definition
+        id: register-task-def
+        run: |
+          echo "📋 Registering new task definition..."
+
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://task-definition-final.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "TASK_DEFINITION_ARN=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+          echo "✅ Registered task definition: $TASK_DEF_ARN"
+
+      - name: Deploy ECS service
+        run: |
+          echo "🚀 Deploying ECS service using deployment script..."
+          chmod +x ./ecs/scripts/deploy-service.sh
+          ./ecs/scripts/deploy-service.sh ci "${{ steps.register-task-def.outputs.TASK_DEFINITION_ARN }}"
+
+      - name: Verify deployment
+        run: |
+          echo "🔍 Verifying deployment..."
+
+          # Get service details
+          SERVICE_INFO=$(aws ecs describe-services \
+            --cluster complex-cluster-ci \
+            --services complex-ticket-service-ci \
+            --query 'services[0]' \
+            --output json)
+
+          RUNNING_COUNT=$(echo $SERVICE_INFO | jq -r '.runningCount')
+          DESIRED_COUNT=$(echo $SERVICE_INFO | jq -r '.desiredCount')
+          TASK_DEF=$(echo $SERVICE_INFO | jq -r '.taskDefinition')
+
+          echo "📊 Service Status:"
+          echo "  - Running tasks: $RUNNING_COUNT"
+          echo "  - Desired tasks: $DESIRED_COUNT"
+          echo "  - Task definition: $TASK_DEF"
+
+          if [ "$RUNNING_COUNT" -eq "$DESIRED_COUNT" ]; then
+            echo "✅ All tasks are running successfully!"
+          else
+            echo "⚠️ Running count ($RUNNING_COUNT) doesn't match desired count ($DESIRED_COUNT)"
+          fi
+
+      - name: Get service endpoints
+        run: |
+          echo "🌐 Service endpoints:"
+          echo "**Internal endpoint:** \`ticket-service.complex-ci.local:3000\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Health check:** \`http://ticket-service.complex-ci.local:3000/\`" >> $GITHUB_STEP_SUMMARY
+          echo "**API docs:** \`http://ticket-service.complex-ci.local:3000/api-docs\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment Summary:**" >> $GITHUB_STEP_SUMMARY
+          echo "- 🐳 **Image:** \`${{ steps.verify-image.outputs.FINAL_IMAGE_URI }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏷️ **Tag:** \`${{ steps.prepare.outputs.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🎯 **Environment:** \`ci\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 📋 **Task Definition:** \`${{ steps.register-task-def.outputs.TASK_DEFINITION_ARN }}\`" >> $GITHUB_STEP_SUMMARY
+
+  post-deployment:
+    name: Post-Deployment Tasks
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Deployment notification
+        run: |
+          if [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "🎉 Deployment to CI environment completed successfully!"
+            echo "🔗 Service is available at ticket-service.complex-ci.local:3000"
+          else
+            echo "❌ Deployment to CI environment failed!"
+            echo "🔍 Check the deployment logs for more details."
+          fi
