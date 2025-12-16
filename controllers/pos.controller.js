@@ -9,6 +9,82 @@ const { StatusCodes } = require('http-status-codes');
  */
 
 /**
+ * Fetch wishlist by QR token only (real QR scan scenario)
+ * POST /api/pos/wishlists/fetch-by-qr
+ */
+exports.fetchByQRToken = async (req, res, next) => {
+    try {
+        const { qr_token } = req.body;
+
+        if (!qr_token) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                error: 'qr_token is required'
+            });
+        }
+
+        const wishlist = await Wishlist.findOne({
+            where: { qr_code_token: qr_token },
+            include: [{
+                model: WishlistItem,
+                as: 'items'
+            }]
+        });
+
+        if (!wishlist) {
+            return res.status(StatusCodes.NOT_FOUND).json({
+                error: 'Wishlist not found'
+            });
+        }
+
+        // Check if QR code already used
+        if (wishlist.qr_code_used_at) {
+            return res.status(StatusCodes.CONFLICT).json({
+                error: 'QR code has already been used',
+                used_at: wishlist.qr_code_used_at
+            });
+        }
+
+        // Check if wishlist expired
+        if (new Date() > new Date(wishlist.expires_at)) {
+            await wishlist.update({ status: 'EXPIRED' });
+            return res.status(StatusCodes.GONE).json({
+                error: 'Wishlist has expired',
+                expired_at: wishlist.expires_at
+            });
+        }
+
+        // Check wishlist status
+        if (wishlist.status !== 'ACTIVE') {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                error: `Wishlist is ${wishlist.status} and cannot be processed`
+            });
+        }
+
+        // Mark QR code as used and update status
+        await wishlist.update({
+            qr_code_used_at: new Date(),
+            status: 'PROCESSING'
+        });
+
+        // Fetch updated wishlist
+        const updatedWishlist = await Wishlist.findByPk(wishlist.wishlist_id, {
+            include: [{
+                model: WishlistItem,
+                as: 'items'
+            }]
+        });
+
+        res.status(StatusCodes.OK).json({
+            wishlist: updatedWishlist,
+            message: 'Wishlist ready for processing'
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
  * Fetch wishlist for POS processing
  * Validates QR token and marks it as used
  * POST /api/pos/wishlists/:wishlistId/fetch

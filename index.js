@@ -80,4 +80,10 @@ const startServer = async () => {
     }
 };
 
-startServer();
+// Only start the server if this file is run directly
+if (require.main === module) {
+    startServer();
+}
+
+// Export for testing
+module.exports = { app, startServer };

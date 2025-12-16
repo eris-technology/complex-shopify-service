@@ -15,6 +15,9 @@ const express = require('express');
 const router = express.Router();
 const posController = require('../controllers/pos.controller');
 
+// Fetch wishlist by QR token only (real QR scan)
+router.post('/wishlists/fetch-by-qr', posController.fetchByQRToken);
+
 // Fetch wishlist for POS processing (validates QR token)
 router.post('/wishlists/:wishlistId/fetch', posController.fetchWishlist);
 

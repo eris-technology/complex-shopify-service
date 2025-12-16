@@ -115,9 +115,137 @@ paths:
                   offset:
                     type: integer
 
+  /api/wishlists/{wishlistId}:
+    get:
+      summary: Get wishlist by ID
+      tags: [Wishlist]
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wishlist details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wishlist:
+                    $ref: '#/components/schemas/Wishlist'
+        '404':
+          description: Wishlist not found
+
+    delete:
+      summary: Cancel wishlist
+      tags: [Wishlist]
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wishlist cancelled successfully
+
+  /api/wishlists/{wishlistId}/items:
+    put:
+      summary: Update wishlist items
+      tags: [Wishlist]
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/WishlistItemInput'
+      responses:
+        '200':
+          description: Wishlist items updated
+        '400':
+          description: Cannot update non-active wishlist
+        '404':
+          description: Wishlist not found
+
+  /api/wishlists/{wishlistId}/expire:
+    post:
+      summary: Manually expire wishlist
+      tags: [Wishlist]
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wishlist expired successfully
+        '404':
+          description: Wishlist not found
+
+  /api/pos/wishlists/fetch-by-qr:
+    post:
+      summary: Fetch wishlist by QR token (real QR scan)
+      description: |
+        Primary endpoint for QR code scanning at POS.
+        Looks up wishlist by QR token only, validates it, and marks as PROCESSING.
+        This is what a real POS system would call when scanning a customer's QR code.
+      tags: [POS]
+      security:
+        - PosSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - qr_token
+              properties:
+                qr_token:
+                  type: string
+                  description: QR code token from scanned QR code
+                  example: 46c05ad827b779afa78adb0ba5d30553260d357068d841bad017de651897a08b
+      responses:
+        '200':
+          description: Wishlist ready for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wishlist:
+                    $ref: '#/components/schemas/Wishlist'
+                  message:
+                    type: string
+        '400':
+          description: Invalid request or wishlist not ACTIVE
+        '404':
+          description: Wishlist not found
+        '409':
+          description: QR code already used
+        '410':
+          description: Wishlist expired
+
   /api/pos/wishlists/{wishlistId}/fetch:
     post:
-      summary: Fetch wishlist for POS processing
+      summary: Fetch wishlist for POS processing (with ID)
+      description: |
+        Alternative endpoint that requires both wishlist ID and QR token.
+        Use /fetch-by-qr instead for real QR scanning scenarios.
       tags: [POS]
       security:
         - PosSecret: []
@@ -138,19 +266,337 @@ paths:
               properties:
                 qr_token:
                   type: string
+                  description: QR code token from wishlist
       responses:
         '200':
           description: Wishlist ready for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wishlist:
+                    $ref: '#/components/schemas/Wishlist'
+                  message:
+                    type: string
+        '400':
+          description: Invalid request or wishlist not ACTIVE
+        '403':
+          description: Invalid QR code token
+        '404':
+          description: Wishlist not found
+        '409':
+          description: QR code already used
+        '410':
+          description: Wishlist expired
+
+  /api/pos/wishlists/{wishlistId}/complete:
+    post:
+      summary: Mark wishlist as completed
+      description: Records order completion with optional Shopify order ID
+      tags: [POS]
+      security:
+        - PosSecret: []
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                processed_by:
+                  type: string
+                  description: POS user/staff identifier
+                shopify_order_id:
+                  type: string
+                  description: Shopify order/draft order ID
+      responses:
+        '200':
+          description: Wishlist completed successfully
+        '400':
+          description: Wishlist not in PROCESSING state
+        '404':
+          description: Wishlist not found
+
+  /api/pos/wishlists/{wishlistId}/cancel:
+    post:
+      summary: Cancel wishlist from POS
+      tags: [POS]
+      security:
+        - PosSecret: []
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Cancellation reason
+      responses:
+        '200':
+          description: Wishlist cancelled successfully
+        '404':
+          description: Wishlist not found
+
+  /api/pos/wishlists/{wishlistId}/status:
+    get:
+      summary: Get wishlist status
+      tags: [POS]
+      security:
+        - PosSecret: []
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wishlist status information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ACTIVE, PROCESSING, COMPLETED, CANCELLED, EXPIRED]
+                  qr_code_used:
+                    type: boolean
+                  processed:
+                    type: boolean
+                  expired:
+                    type: boolean
+        '404':
+          description: Wishlist not found
 
   /api/mobile/wishlists:
+    post:
+      summary: Create wishlist from mobile app
+      tags: [Mobile]
+      security:
+        - JwtAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - items
+              properties:
+                user_id:
+                  type: string
+                  description: User ID from BFF authentication
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/WishlistItemInput'
+                metadata:
+                  type: object
+      responses:
+        '201':
+          description: Wishlist created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wishlist:
+                    $ref: '#/components/schemas/Wishlist'
+        '400':
+          description: Invalid request
+
     get:
       summary: Get my wishlists
       tags: [Mobile]
       security:
         - JwtAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
       responses:
         '200':
           description: List of user's wishlists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wishlists:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Wishlist'
+                  total:
+                    type: integer
+        '400':
+          description: user_id required
+
+  /api/mobile/wishlists/{wishlistId}:
+    get:
+      summary: Get specific wishlist
+      tags: [Mobile]
+      security:
+        - JwtAuth: []
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wishlist details
+        '404':
+          description: Wishlist not found or access denied
+
+    put:
+      summary: Update wishlist
+      tags: [Mobile]
+      security:
+        - JwtAuth: []
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+              properties:
+                user_id:
+                  type: string
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/WishlistItemInput'
+                metadata:
+                  type: object
+      responses:
+        '200':
+          description: Wishlist updated successfully
+        '400':
+          description: Cannot update non-active wishlist
+        '404':
+          description: Wishlist not found or access denied
+
+    delete:
+      summary: Delete wishlist
+      tags: [Mobile]
+      security:
+        - JwtAuth: []
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wishlist deleted successfully
+        '404':
+          description: Wishlist not found or access denied
+
+  /api/mobile/wishlists/{wishlistId}/qr:
+    post:
+      summary: Get QR code for wishlist
+      description: Returns QR code data for displaying on mobile device
+      tags: [Mobile]
+      security:
+        - JwtAuth: []
+      parameters:
+        - name: wishlistId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+              properties:
+                user_id:
+                  type: string
+      responses:
+        '200':
+          description: QR code data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  qr_data:
+                    type: object
+                    properties:
+                      wishlist_id:
+                        type: string
+                      qr_token:
+                        type: string
+                      items:
+                        type: array
+                        items:
+                          type: object
+                  qr_token:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: Cannot generate QR for non-active wishlist
+        '404':
+          description: Wishlist not found or access denied
+        '410':
+          description: Wishlist expired
 
   /api/products:
     get:
