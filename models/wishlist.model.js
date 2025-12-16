@@ -25,6 +25,12 @@ const Wishlist = sequelize.define('Wishlist', {
     }
   },
 
+  collection_id: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    comment: 'Shopify collection ID this wishlist is associated with'
+  },
+
   status: {
     type: DataTypes.ENUM('ACTIVE', 'PROCESSING', 'COMPLETED', 'CANCELLED', 'EXPIRED'),
     allowNull: false,
@@ -109,6 +115,9 @@ const Wishlist = sequelize.define('Wishlist', {
     },
     {
       fields: ['expires_at']
+    },
+    {
+      fields: ['user_id', 'collection_id']
     }
   ]
 });

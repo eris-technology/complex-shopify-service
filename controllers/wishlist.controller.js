@@ -67,9 +67,14 @@ exports.createWishlist = async (req, res, next) => {
         // Generate QR code token
         const qrCodeToken = crypto.randomBytes(32).toString('hex');
 
+        // Extract collection_id from first item (if available)
+        const firstItem = items[0];
+        const collectionId = firstItem?.collection_id || firstItem?.collectionId || null;
+
         // Create wishlist
         const wishlist = await Wishlist.create({
             user_id,
+            collection_id: collectionId,
             status: 'ACTIVE',
             source,
             qr_code_token: qrCodeToken,
