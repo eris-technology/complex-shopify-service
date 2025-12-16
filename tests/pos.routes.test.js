@@ -3,6 +3,10 @@ const { app } = require('../index');
 const { Wishlist, WishlistItem } = require('../models');
 const { sequelize } = require('complex-common-utils');
 
+// POS authentication token for tests
+const POS_SECRET = 'test-pos-secret-token';
+process.env.POS_SECRET_TOKEN = POS_SECRET;
+
 describe('POS Routes', () => {
 
   beforeAll(async () => {
@@ -19,6 +23,29 @@ describe('POS Routes', () => {
     // Clean database before each test
     await WishlistItem.destroy({ where: {}, force: true });
     await Wishlist.destroy({ where: {}, force: true });
+  });
+
+  describe('POS Authentication', () => {
+    it('should reject requests without x-pos-secret header', async () => {
+      const response = await request(app)
+        .post('/api/pos/wishlists/fetch-by-qr')
+        .send({ qr_token: 'test-token' });
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('error', 'POS authentication required');
+      expect(response.body).toHaveProperty('message', 'Missing x-pos-secret header');
+    });
+
+    it('should reject requests with invalid x-pos-secret', async () => {
+      const response = await request(app)
+        .post('/api/pos/wishlists/fetch-by-qr')
+        .set('x-pos-secret', 'wrong-secret')
+        .send({ qr_token: 'test-token' });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toHaveProperty('error', 'Invalid POS credentials');
+      expect(response.body).toHaveProperty('message', 'Invalid x-pos-secret token');
+    });
   });
 
   describe('POST /api/pos/wishlists/fetch-by-qr', () => {
@@ -48,6 +75,7 @@ describe('POS Routes', () => {
     it('should fetch wishlist by QR token only', async () => {
       const response = await request(app)
         .post('/api/pos/wishlists/fetch-by-qr')
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: validQRToken });
 
       expect(response.status).toBe(200);
@@ -62,6 +90,7 @@ describe('POS Routes', () => {
     it('should reject request without qr_token', async () => {
       const response = await request(app)
         .post('/api/pos/wishlists/fetch-by-qr')
+        .set('x-pos-secret', POS_SECRET)
         .send({});
 
       expect(response.status).toBe(400);
@@ -71,6 +100,7 @@ describe('POS Routes', () => {
     it('should return 404 for non-existent QR token', async () => {
       const response = await request(app)
         .post('/api/pos/wishlists/fetch-by-qr')
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: 'non-existent-token' });
 
       expect(response.status).toBe(404);
@@ -81,11 +111,13 @@ describe('POS Routes', () => {
       // First use
       await request(app)
         .post('/api/pos/wishlists/fetch-by-qr')
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: validQRToken });
 
       // Try to use again
       const response = await request(app)
         .post('/api/pos/wishlists/fetch-by-qr')
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: validQRToken });
 
       expect(response.status).toBe(409);
@@ -104,6 +136,7 @@ describe('POS Routes', () => {
 
       const response = await request(app)
         .post('/api/pos/wishlists/fetch-by-qr')
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: 'expired-qr-token' });
 
       expect(response.status).toBe(410);
@@ -116,6 +149,7 @@ describe('POS Routes', () => {
 
       const response = await request(app)
         .post('/api/pos/wishlists/fetch-by-qr')
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: validQRToken });
 
       expect(response.status).toBe(400);
@@ -150,6 +184,7 @@ describe('POS Routes', () => {
     it('should fetch wishlist with valid QR token', async () => {
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/fetch`)
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: validQRToken });
 
       expect(response.status).toBe(200);
@@ -163,6 +198,7 @@ describe('POS Routes', () => {
     it('should reject request without qr_token', async () => {
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/fetch`)
+        .set('x-pos-secret', POS_SECRET)
         .send({});
 
       expect(response.status).toBe(400);
@@ -172,6 +208,7 @@ describe('POS Routes', () => {
     it('should reject request with invalid QR token', async () => {
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/fetch`)
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: 'invalid-token' });
 
       expect(response.status).toBe(403);
@@ -182,11 +219,13 @@ describe('POS Routes', () => {
       // First use the QR code
       await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/fetch`)
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: validQRToken });
 
       // Try to use it again
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/fetch`)
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: validQRToken });
 
       expect(response.status).toBe(409);
@@ -206,6 +245,7 @@ describe('POS Routes', () => {
 
       const response = await request(app)
         .post(`/api/pos/wishlists/${expiredWishlist.wishlist_id}/fetch`)
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: 'expired-token' });
 
       expect(response.status).toBe(410);
@@ -216,6 +256,7 @@ describe('POS Routes', () => {
     it('should return 404 for non-existent wishlist', async () => {
       const response = await request(app)
         .post('/api/pos/wishlists/00000000-0000-0000-0000-000000000000/fetch')
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: validQRToken });
 
       expect(response.status).toBe(404);
@@ -227,6 +268,7 @@ describe('POS Routes', () => {
 
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/fetch`)
+        .set('x-pos-secret', POS_SECRET)
         .send({ qr_token: validQRToken });
 
       expect(response.status).toBe(400);
@@ -256,6 +298,7 @@ describe('POS Routes', () => {
 
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/complete`)
+        .set('x-pos-secret', POS_SECRET)
         .send(completeData);
 
       expect(response.status).toBe(200);
@@ -269,6 +312,7 @@ describe('POS Routes', () => {
     it('should complete wishlist without optional fields', async () => {
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/complete`)
+        .set('x-pos-secret', POS_SECRET)
         .send({});
 
       expect(response.status).toBe(200);
@@ -279,6 +323,7 @@ describe('POS Routes', () => {
     it('should return 404 for non-existent wishlist', async () => {
       const response = await request(app)
         .post('/api/pos/wishlists/00000000-0000-0000-0000-000000000000/complete')
+        .set('x-pos-secret', POS_SECRET)
         .send({});
 
       expect(response.status).toBe(404);
@@ -290,6 +335,7 @@ describe('POS Routes', () => {
 
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/complete`)
+        .set('x-pos-secret', POS_SECRET)
         .send({});
 
       expect(response.status).toBe(400);
@@ -318,6 +364,7 @@ describe('POS Routes', () => {
 
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/cancel`)
+        .set('x-pos-secret', POS_SECRET)
         .send(cancelData);
 
       expect(response.status).toBe(200);
@@ -329,6 +376,7 @@ describe('POS Routes', () => {
     it('should cancel wishlist without reason', async () => {
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/cancel`)
+        .set('x-pos-secret', POS_SECRET)
         .send({});
 
       expect(response.status).toBe(200);
@@ -338,6 +386,7 @@ describe('POS Routes', () => {
     it('should return 404 for non-existent wishlist', async () => {
       const response = await request(app)
         .post('/api/pos/wishlists/00000000-0000-0000-0000-000000000000/cancel')
+        .set('x-pos-secret', POS_SECRET)
         .send({});
 
       expect(response.status).toBe(404);
@@ -349,6 +398,7 @@ describe('POS Routes', () => {
 
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/cancel`)
+        .set('x-pos-secret', POS_SECRET)
         .send({});
 
       expect(response.status).toBe(200);
@@ -360,6 +410,7 @@ describe('POS Routes', () => {
 
       const response = await request(app)
         .post(`/api/pos/wishlists/${testWishlist.wishlist_id}/cancel`)
+        .set('x-pos-secret', POS_SECRET)
         .send({});
 
       expect(response.status).toBe(200);
@@ -383,7 +434,8 @@ describe('POS Routes', () => {
 
     it('should get wishlist status', async () => {
       const response = await request(app)
-        .get(`/api/pos/wishlists/${testWishlist.wishlist_id}/status`);
+        .get(`/api/pos/wishlists/${testWishlist.wishlist_id}/status`)
+        .set('x-pos-secret', POS_SECRET);
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('status', 'PROCESSING');
@@ -402,7 +454,8 @@ describe('POS Routes', () => {
       });
 
       const response = await request(app)
-        .get(`/api/pos/wishlists/${expiredWishlist.wishlist_id}/status`);
+        .get(`/api/pos/wishlists/${expiredWishlist.wishlist_id}/status`)
+        .set('x-pos-secret', POS_SECRET);
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('expired', true);
@@ -418,7 +471,8 @@ describe('POS Routes', () => {
       });
 
       const response = await request(app)
-        .get(`/api/pos/wishlists/${unusedWishlist.wishlist_id}/status`);
+        .get(`/api/pos/wishlists/${unusedWishlist.wishlist_id}/status`)
+        .set('x-pos-secret', POS_SECRET);
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('qr_code_used', false);
@@ -426,7 +480,8 @@ describe('POS Routes', () => {
 
     it('should return 404 for non-existent wishlist', async () => {
       const response = await request(app)
-        .get('/api/pos/wishlists/00000000-0000-0000-0000-000000000000/status');
+        .get('/api/pos/wishlists/00000000-0000-0000-0000-000000000000/status')
+        .set('x-pos-secret', POS_SECRET);
 
       expect(response.status).toBe(404);
       expect(response.body).toHaveProperty('error', 'Wishlist not found');

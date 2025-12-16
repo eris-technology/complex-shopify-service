@@ -2,9 +2,10 @@
  * POS Extension Routes
  * 
  * Endpoints specifically for Shopify POS extension
- * Service sits behind BFF - authentication handled there
+ * These endpoints are internet-facing and protected with POS secret token
  * 
  * Route Structure:
+ * - POST   /api/pos/wishlists/fetch-by-qr    - Fetch wishlist by QR token (real QR scan)
  * - POST   /api/pos/wishlists/:id/fetch      - Fetch wishlist for processing (validates QR token)
  * - POST   /api/pos/wishlists/:id/complete   - Mark wishlist as completed
  * - POST   /api/pos/wishlists/:id/cancel     - Cancel wishlist from POS
@@ -14,6 +15,10 @@
 const express = require('express');
 const router = express.Router();
 const posController = require('../controllers/pos.controller');
+const posAuthMiddleware = require('../middleware/posAuth');
+
+// Apply POS authentication middleware to all routes
+router.use(posAuthMiddleware);
 
 // Fetch wishlist by QR token only (real QR scan)
 router.post('/wishlists/fetch-by-qr', posController.fetchByQRToken);

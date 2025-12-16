@@ -176,11 +176,25 @@ curl -X POST "http://localhost:3000/api/mobile/wishlists/WISHLIST_ID/qr" \
 
 ## 4. POS Routes
 
-### Fetch Wishlist (with QR Token)
+**Note:** POS routes require authentication via `x-pos-secret` header.
+
+### Fetch Wishlist by QR Token (Primary QR Scan Endpoint)
+```bash
+# Replace QR_TOKEN with actual value from create/qr response
+curl -X POST "http://localhost:3000/api/pos/wishlists/fetch-by-qr" \
+  -H "Content-Type: application/json" \
+  -H "x-pos-secret: YOUR_POS_SECRET_TOKEN" \
+  -d '{
+    "qr_token": "YOUR_QR_TOKEN_HERE"
+  }'
+```
+
+### Fetch Wishlist (with ID and QR Token)
 ```bash
 # Replace WISHLIST_ID and QR_TOKEN with actual values from create/qr response
 curl -X POST "http://localhost:3000/api/pos/wishlists/WISHLIST_ID/fetch" \
   -H "Content-Type: application/json" \
+  -H "x-pos-secret: YOUR_POS_SECRET_TOKEN" \
   -d '{
     "qr_token": "YOUR_QR_TOKEN_HERE"
   }'
@@ -191,6 +205,7 @@ curl -X POST "http://localhost:3000/api/pos/wishlists/WISHLIST_ID/fetch" \
 # Replace WISHLIST_ID with actual ID (must be in PROCESSING state)
 curl -X POST "http://localhost:3000/api/pos/wishlists/WISHLIST_ID/complete" \
   -H "Content-Type: application/json" \
+  -H "x-pos-secret: YOUR_POS_SECRET_TOKEN" \
   -d '{
     "processed_by": "POS_USER_001",
     "shopify_order_id": "ORDER-12345"
@@ -202,6 +217,7 @@ curl -X POST "http://localhost:3000/api/pos/wishlists/WISHLIST_ID/complete" \
 # Replace WISHLIST_ID with actual ID
 curl -X POST "http://localhost:3000/api/pos/wishlists/WISHLIST_ID/cancel" \
   -H "Content-Type: application/json" \
+  -H "x-pos-secret: YOUR_POS_SECRET_TOKEN" \
   -d '{
     "reason": "Customer changed mind"
   }'
@@ -210,7 +226,9 @@ curl -X POST "http://localhost:3000/api/pos/wishlists/WISHLIST_ID/cancel" \
 ### Get Wishlist Status
 ```bash
 # Replace WISHLIST_ID with actual ID
-curl -X GET "http://localhost:3000/api/pos/wishlists/WISHLIST_ID/status" -H "Content-Type: application/json"
+curl -X GET "http://localhost:3000/api/pos/wishlists/WISHLIST_ID/status" \
+  -H "Content-Type: application/json" \
+  -H "x-pos-secret: YOUR_POS_SECRET_TOKEN"
 ```
 
 ---

@@ -18,9 +18,13 @@ Wishlist service for Shopify POS extensions and mobile app integration. Replaces
 
 - **Framework**: Express.js
 - **Database**: PostgreSQL (Sequelize ORM)
-- **Authentication**: Handled by BFF - service sits behind BFF layer
-  - BFF validates JWT tokens and passes user_id to this service
-  - This service trusts requests from BFF (internal network only)
+- **Authentication**: 
+  - **POS Routes**: Protected with POS secret token (`x-pos-secret` header)
+    - POS endpoints are internet-facing (Shopify POS extension)
+    - Require `POS_SECRET_TOKEN` environment variable
+  - **Mobile/Wishlist Routes**: Protected by BFF
+    - BFF validates JWT tokens and passes user_id to this service
+    - Service trusts requests from BFF (internal network only)
 - **Common Utils**: Uses `complex-common-utils` for database initialization
 
 ## Installation
@@ -100,7 +104,8 @@ Once running, visit:
 - `PUT /api/wishlists/:id/items` - Update items
 - `DELETE /api/wishlists/:id` - Cancel wishlist
 
-### POS Extension Endpoints (called via BFF)
+### POS Extension Endpoints (requires `x-pos-secret` header)
+- `POST /api/pos/wishlists/fetch-by-qr` - Fetch by QR token only (primary scan endpoint)
 - `POST /api/pos/wishlists/:id/fetch` - Fetch for processing (validates QR token)
 - `POST /api/pos/wishlists/:id/complete` - Mark as completed
 - `POST /api/pos/wishlists/:id/cancel` - Cancel from POS
