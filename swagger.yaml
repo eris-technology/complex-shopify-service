@@ -385,9 +385,8 @@ paths:
   /api/mobile/wishlists:
     post:
       summary: Create wishlist from mobile app
+      description: Accessed via BFF - authentication handled at BFF layer
       tags: [Mobile]
-      security:
-        - JwtAuth: []
       requestBody:
         required: true
         content:
@@ -422,9 +421,8 @@ paths:
 
     get:
       summary: Get my wishlists
+      description: Accessed via BFF - authentication handled at BFF layer
       tags: [Mobile]
-      security:
-        - JwtAuth: []
       parameters:
         - name: user_id
           in: query
@@ -465,9 +463,8 @@ paths:
   /api/mobile/wishlists/{wishlistId}:
     get:
       summary: Get specific wishlist
+      description: Accessed via BFF - authentication handled at BFF layer
       tags: [Mobile]
-      security:
-        - JwtAuth: []
       parameters:
         - name: wishlistId
           in: path
@@ -487,9 +484,8 @@ paths:
 
     put:
       summary: Update wishlist
+      description: Accessed via BFF - authentication handled at BFF layer
       tags: [Mobile]
-      security:
-        - JwtAuth: []
       parameters:
         - name: wishlistId
           in: path
@@ -523,9 +519,8 @@ paths:
 
     delete:
       summary: Delete wishlist
+      description: Accessed via BFF - authentication handled at BFF layer
       tags: [Mobile]
-      security:
-        - JwtAuth: []
       parameters:
         - name: wishlistId
           in: path
@@ -546,10 +541,8 @@ paths:
   /api/mobile/wishlists/{wishlistId}/qr:
     post:
       summary: Get QR code for wishlist
-      description: Returns QR code data for displaying on mobile device
+      description: Returns QR code data for displaying on mobile device. Accessed via BFF - authentication handled at BFF layer
       tags: [Mobile]
-      security:
-        - JwtAuth: []
       parameters:
         - name: wishlistId
           in: path
@@ -697,10 +690,9 @@ components:
       type: apiKey
       in: header
       name: X-POS-Secret
-    JwtAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+      description: |
+        Secret token for POS endpoints (internet-facing).
+        Mobile/wishlist endpoints don't require this - they're accessed via BFF with authentication handled there.
 
   schemas:
     WishlistItemInput:
