@@ -9,7 +9,7 @@ require('dotenv').config();
 // Import models first to ensure they're registered with Sequelize
 require('./models');
 
-const { initializeDatabase } = require('complex-common-utils');
+const { initializeDatabase, performanceLogger } = require('complex-common-utils');
 const { initializeRedis } = require('./utils/cache');
 
 const app = express();
@@ -28,6 +28,9 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use(morgan('dev', {
     skip: (req, res) => req.path === '/health'
 }));
+
+// Performance logging middleware
+app.use(performanceLogger({ excludePaths: ['/health', '/api-docs'], slowThreshold: 1000 }));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
