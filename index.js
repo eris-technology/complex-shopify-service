@@ -6,6 +6,17 @@ const YAML = require('yamljs');
 const path = require('path');
 require('dotenv').config();
 
+// Sentry initialization (conditional based on ENABLE_SENTRY)
+if (process.env.ENABLE_SENTRY === 'TRUE' || process.env.ENABLE_SENTRY === 'true') {
+  const Sentry = require("@sentry/node");
+  Sentry.init({ 
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1,
+    environment: process.env.NODE_ENV || 'development'
+  });
+  console.log('✓ Sentry monitoring enabled');
+}
+
 // Import models first to ensure they're registered with Sequelize
 require('./models');
 
