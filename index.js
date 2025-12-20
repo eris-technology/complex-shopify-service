@@ -12,7 +12,13 @@ if (process.env.ENABLE_SENTRY === 'TRUE' || process.env.ENABLE_SENTRY === 'true'
   Sentry.init({ 
     dsn: process.env.SENTRY_DSN,
     tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1,
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    integrations: [
+      // Send console.log, console.warn, and console.error calls as logs to Sentry
+      Sentry.consoleIntegration({ levels: ["log", "warn", "error"] }),
+    ],
+    // Enable logs to be sent to Sentry
+    enableLogs: true,
   });
   console.log('✓ Sentry monitoring enabled');
 }
