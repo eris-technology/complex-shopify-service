@@ -6,21 +6,54 @@ const YAML = require('yamljs');
 const path = require('path');
 require('dotenv').config();
 
-// Sentry initialization (conditional based on ENABLE_SENTRY)
+// Sentry initialization - MUST be first, before any other requires
+let Sentry;
 if (process.env.ENABLE_SENTRY === 'TRUE' || process.env.ENABLE_SENTRY === 'true') {
-  const Sentry = require("@sentry/node");
+  Sentry = require("@sentry/node");
+  
   Sentry.init({ 
     dsn: process.env.SENTRY_DSN,
-    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1,
     environment: process.env.NODE_ENV || 'development',
+    
+    // Performance Monitoring
+    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1,
+    profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE) || 0.1,
+    
+    // Enhanced integrations for better error tracking and breadcrumbs
     integrations: [
-      // Send console.log, console.warn, and console.error calls as logs to Sentry
-      Sentry.consoleIntegration({ levels: ["log", "warn", "error"] }),
+      new Sentry.Integrations.Http({ tracing: true, breadcrumbs: true }),
+      new Sentry.Integrations.Console(),
+      new Sentry.Integrations.OnUncaughtException(),
+      new Sentry.Integrations.OnUnhandledRejection(),
     ],
-    // Enable logs to be sent to Sentry
+    
+    // Dynamic sampling - always capture slow transactions
+    tracesSampler: (samplingContext) => {
+      const parentSampled = samplingContext.parentSampled;
+      if (parentSampled !== undefined) {
+        return parentSampled;
+      }
+      return parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1;
+    },
+    
+    // Enrich error events with service metadata
+    beforeSend(event, hint) {
+      event.tags = { ...event.tags, service: 'shopify-service' };
+      return event;
+    },
+    
+    beforeSendTransaction(event) {
+      const duration = (event.timestamp - event.start_timestamp) * 1000; // Convert to ms
+      if (duration > 1000) {
+        event.tags = { ...event.tags, slow_transaction: 'true' };
+      }
+      return event;
+    },
+    
     enableLogs: true,
   });
-  console.log('✓ Sentry monitoring enabled');
+  
+  console.log('✓ Sentry monitoring enabled for shopify-service');
 }
 
 // Import models first to ensure they're registered with Sequelize
@@ -30,6 +63,12 @@ const { initializeDatabase, performanceLogger } = require('complex-common-utils'
 const { initializeRedis } = require('./utils/cache');
 
 const app = express();
+
+// Sentry request handler - MUST be first middleware
+if (Sentry) {
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
+}
 
 // Load Swagger document
 const swaggerDocument = YAML.load(path.join(__dirname, 'swagger.yaml'));
@@ -46,8 +85,12 @@ app.use(morgan('dev', {
     skip: (req, res) => req.path === '/health'
 }));
 
-// Performance logging middleware
-app.use(performanceLogger({ excludePaths: ['/health', '/api-docs'], slowThreshold: 1000 }));
+// Performance logging middleware (integrates with Sentry when enabled)
+app.use(performanceLogger({
+  excludePaths: ['/health', '/api-docs'],
+  slowThreshold: 1000,
+  sentryEnabled: !!Sentry
+}));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -70,7 +113,17 @@ app.get('/', (req, res) => {
     });
 });
 
-// Error handling middleware
+// Sentry error handler - MUST be after routes but before custom error handlers
+if (Sentry) {
+  app.use(Sentry.Handlers.errorHandler({
+    shouldHandleError(error) {
+      // Capture all errors with status code >= 400
+      return true;
+    },
+  }));
+}
+
+// Error handling middleware (must be after Sentry error handler)
 app.use((err, req, res, next) => {
     console.error('Error:', err.message);
     console.error('Stack:', err.stack);
