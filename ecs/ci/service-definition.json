@@ -10,12 +10,6 @@
       "assignPublicIp": "DISABLED"
     }
   },
-  "serviceRegistries": [
-    {
-      "registryArn": "arn:aws:servicediscovery:ap-east-1:677276100051:service/srv-mxttyucypbmgri23",
-      "containerName": "complex-shopify-service"
-    }
-  ],
   "capacityProviderStrategy": [
   {
     "capacityProvider": "FARGATE_SPOT",

@@ -71,7 +71,7 @@
         },
         {
           "name": "USER_SERVICE_URL",
-          "value": "http://user-service.complex-ci.local:3001"
+          "value": "http://user-service.internal.ticketing.eris-technology.com"
         }
       ],
       "secrets": [
