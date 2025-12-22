@@ -59,11 +59,6 @@ if (process.env.ENABLE_SENTRY === 'TRUE' || process.env.ENABLE_SENTRY === 'true'
     Sentry = null;
   }
 }
-      return event;
-    },
-    
-  });
-}
 
 // Initialize logger AFTER Sentry, passing the Sentry instance
 const createLogger = require('./logger');
@@ -80,12 +75,6 @@ const { initializeDatabase, performanceLogger } = require('complex-common-utils'
 const { initializeRedis } = require('./utils/cache');
 
 const app = express();
-
-// Sentry request handler - MUST be first middleware
-if (Sentry) {
-  app.use(Sentry.Handlers.requestHandler());
-  app.use(Sentry.Handlers.tracingHandler());
-}
 
 // Load Swagger document
 const swaggerDocument = YAML.load(path.join(__dirname, 'swagger.yaml'));
@@ -184,17 +173,7 @@ app.get('/', (req, res) => {
     });
 });
 
-// Sentry error handler - MUST be after routes but before custom error handlers
-if (Sentry) {
-  app.use(Sentry.Handlers.errorHandler({
-    shouldHandleError(error) {
-      // Capture all errors with status code >= 400
-      return true;
-    },
-  }));
-}
-
-// Error handling middleware (must be after Sentry error handler)
+// Error handling middleware
 app.use((err, req, res, next) => {
     const statusCode = err.statusCode || err.status || 500;
     
