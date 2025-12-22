@@ -36,8 +36,10 @@ if (process.env.ENABLE_SENTRY === 'TRUE' || process.env.ENABLE_SENTRY === 'true'
       return parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1;
     },
     
-    // Enrich error events with service metadata
+    // Enrich error events with service metadata - this sets the Issue title
     beforeSend(event, hint) {
+      // Set server_name which appears in Sentry Issues
+      event.server_name = 'shopify-service';
       event.tags = { ...event.tags, service: 'shopify-service' };
       return event;
     },
