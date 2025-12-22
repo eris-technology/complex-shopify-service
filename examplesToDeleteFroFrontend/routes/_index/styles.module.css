@@ -1,0 +1,277 @@
+/* Import fonts and match kiosk styling */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
+
+/* CSS Variables matching kiosk design system */
+:root {
+  /* Primary Brand Colors */
+  --color-brand-primary: #ff3333;
+  --color-brand-primary-hover: #cc2929;
+  --color-brand-primary-light: #ff6666;
+  
+  /* Background Colors */
+  --color-background-primary: #000000;
+  --color-background-secondary: #1a1a1a;
+  --color-background-tertiary: #2a2a2a;
+  
+  /* Text Colors */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #ccc;
+  --color-text-muted: #8A8A8A;
+  --color-text-accent: #BBB3B6;
+  
+  /* Border Colors */
+  --color-border-primary: #444;
+  --color-border-secondary: #666;
+  --color-border-light: #E9E9E9;
+  
+  /* Status Colors */
+  --color-success: #34A853;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  
+  /* UI Element Colors */
+  --color-ui-background: #f6f6f7;
+  --color-ui-background-alt: #F0F0F0;
+  --color-ui-background-disabled: #C0C0C0;
+  
+  /* Overlay Colors */
+  --color-overlay-dark: rgba(0, 0, 0, 0.9);
+  --color-overlay-light: rgba(255, 255, 255, 0.1);
+  --color-overlay-brand: rgba(255, 51, 51, 0.1);
+  --color-overlay-brand-border: rgba(255, 51, 51, 0.3);
+  
+  /* Shadow Colors */
+  --shadow-brand: 0 8px 25px rgba(255, 51, 51, 0.4);
+  --shadow-brand-hover: 0 12px 35px rgba(255, 51, 51, 0.6);
+  --shadow-subtle: 0 8px 10px 0 rgba(0, 0, 0, 0.10);
+  --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.15);
+  
+  /* Brand Accent Color */
+  --color-brand-accent: #7F0716;
+  
+  /* Font Families */
+  --font-primary: 'Instrument Sans', sans-serif;
+  --font-secondary: 'Roboto', sans-serif;
+  
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 15px;
+  --radius-xl: 20px;
+  --radius-round: 25px;
+}
+
+.index {
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-primary);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  width: 100%;
+}
+
+.content {
+  display: grid;
+  gap: 2rem;
+  max-width: 800px;
+  width: 100%;
+  text-align: center;
+}
+
+.brandingImage {
+  width: 90%;
+  max-width: 300px;
+  height: auto;
+  margin: 0 auto 2rem auto;
+  aspect-ratio: 400/215;
+  object-fit: cover;
+  object-position: center;
+}
+
+.heading {
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  color: var(--color-text-primary);
+}
+
+.text {
+  font-size: 1.2rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 2rem 0;
+  font-weight: 400;
+}
+
+.navigationGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+.navCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem 2rem;
+  border: 2px solid var(--color-border-primary);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: var(--color-text-primary);
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.navCard:hover {
+  border-color: var(--color-brand-primary);
+  background: rgba(255, 51, 51, 0.1);
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-brand);
+}
+
+.navIcon {
+  color: var(--color-brand-primary);
+  margin-bottom: 1.5rem;
+  transition: transform 0.3s ease;
+}
+
+.navCard:hover .navIcon {
+  transform: scale(1.1);
+}
+
+.navCardDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.navCardDisabled:hover {
+  border-color: var(--color-border-primary);
+  background: rgba(255, 255, 255, 0.05);
+  transform: none;
+  box-shadow: none;
+}
+
+.navCardDisabled .navIcon {
+  color: var(--color-text-muted);
+}
+
+.navCardDisabled:hover .navIcon {
+  transform: none;
+}
+
+.navTitle {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.navDescription {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.adminSection {
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--color-border-primary);
+}
+
+.adminHeading {
+  font-size: 1.2rem;
+  margin: 0 0 1.5rem 0;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.label {
+  display: grid;
+  gap: 0.5rem;
+  text-align: left;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.input {
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--color-border-primary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-primary);
+  transition: border-color 0.3s ease;
+  min-width: 250px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-border-secondary);
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.button {
+  padding: 0.75rem 1.5rem;
+  background: var(--color-brand-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-primary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.button:hover {
+  background: var(--color-brand-primary-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-brand);
+}
+
+@media only screen and (max-width: 50rem) {
+  .navigationGrid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .navCard {
+    padding: 2rem 1.5rem;
+  }
+  
+  .heading {
+    font-size: 2rem;
+  }
+  
+  .form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .input {
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .brandingImage {
+    max-width: 250px;
+  }
+}

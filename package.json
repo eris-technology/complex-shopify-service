@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/eris-technology/complex-shopify-service#readme",
   "dependencies": {
+    "@sentry/node": "^8.0.0",
     "axios": "^1.12.0",
     "complex-common-utils": "github:eris-technology/complex-common-utils",
     "dotenv": "^16.3.1",
@@ -36,6 +37,7 @@
     "redis": "^4.7.1",
     "sequelize": "^6.37.7",
     "swagger-ui-express": "^5.0.1",
+    "winston": "^3.11.0",
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
