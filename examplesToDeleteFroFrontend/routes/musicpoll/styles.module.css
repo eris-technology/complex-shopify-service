@@ -1,0 +1,342 @@
+/* Import fonts and match kiosk styling */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
+
+/* CSS Variables matching kiosk design system */
+:root {
+  /* Primary Brand Colors */
+  --color-brand-primary: #ff3333;
+  --color-brand-primary-hover: #cc2929;
+  --color-brand-primary-light: #ff6666;
+  
+  /* Background Colors */
+  --color-background-primary: #000000;
+  --color-background-secondary: #1a1a1a;
+  --color-background-tertiary: #2a2a2a;
+  
+  /* Text Colors */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #ccc;
+  --color-text-muted: #8A8A8A;
+  --color-text-accent: #BBB3B6;
+  
+  /* Border Colors */
+  --color-border-primary: #444;
+  --color-border-secondary: #666;
+  --color-border-light: #E9E9E9;
+  
+  /* Status Colors */
+  --color-success: #34A853;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  
+  /* UI Element Colors */
+  --color-ui-background: #f6f6f7;
+  --color-ui-background-alt: #F0F0F0;
+  --color-ui-background-disabled: #C0C0C0;
+  
+  /* Overlay Colors */
+  --color-overlay-dark: rgba(0, 0, 0, 0.9);
+  --color-overlay-light: rgba(255, 255, 255, 0.1);
+  --color-overlay-brand: rgba(255, 51, 51, 0.1);
+  --color-overlay-brand-border: rgba(255, 51, 51, 0.3);
+  
+  /* Shadow Colors */
+  --shadow-brand: 0 8px 25px rgba(255, 51, 51, 0.4);
+  --shadow-brand-hover: 0 12px 35px rgba(255, 51, 51, 0.6);
+  --shadow-subtle: 0 8px 10px 0 rgba(0, 0, 0, 0.10);
+  --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.15);
+  
+  /* Brand Accent Color */
+  --color-brand-accent: #7F0716;
+  
+  /* Font Families */
+  --font-primary: 'Instrument Sans', sans-serif;
+  --font-secondary: 'Roboto', sans-serif;
+  
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 15px;
+  --radius-xl: 20px;
+  --radius-round: 25px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-primary);
+}
+
+.musicpollContainer {
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-primary);
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.musicpollContent {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.brandingImage {
+  width: 90%;
+  max-width: 300px;
+  height: auto;
+  margin: 0 auto 2rem auto;
+  display: block;
+  aspect-ratio: 400/215;
+  object-fit: cover;
+  object-position: center;
+}
+
+.headerSection {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.pageTitle {
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  color: var(--color-text-primary);
+}
+
+.pageDescription {
+  font-size: 1.2rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 2rem 0;
+  font-weight: 400;
+}
+
+.successMessage {
+  background: rgba(52, 168, 83, 0.1);
+  border: 2px solid var(--color-success);
+  color: var(--color-success);
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  margin-bottom: 2rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+.musicGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.musicCard {
+  padding: 2rem;
+  border: 2px solid var(--color-border-primary);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.musicCard.selected {
+  border-color: var(--color-brand-primary);
+  background: rgba(255, 51, 51, 0.1);
+  box-shadow: var(--shadow-brand);
+  transform: translateY(-5px);
+}
+
+.musicCard:hover {
+  border-color: var(--color-brand-primary);
+  background: rgba(255, 51, 51, 0.05);
+  transform: translateY(-2px);
+}
+
+.musicHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.musicTitle {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.voteBadge {
+  background: var(--color-brand-primary);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-round);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.musicCard.selected .voteBadge {
+  background: var(--color-text-primary);
+  color: var(--color-background-primary);
+}
+
+.musicGenre {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.progressBar {
+  height: 6px;
+  background: var(--color-border-primary);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-brand-primary);
+  transition: width 0.5s ease;
+}
+
+.musicCard.selected .progressFill {
+  background: var(--color-text-primary);
+}
+
+.voteSection {
+  text-align: center;
+  margin: 3rem 0;
+}
+
+.voteButton {
+  padding: 1.2rem 3rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  background: var(--color-brand-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: var(--font-primary);
+  min-width: 200px;
+}
+
+.voteButton:hover:not(:disabled) {
+  background: var(--color-brand-primary-hover);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-brand-hover);
+}
+
+.voteButton:disabled {
+  background: var(--color-border-primary);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.backNavigation {
+  margin-top: 4rem;
+  text-align: center;
+  border-top: 1px solid var(--color-border-primary);
+  padding-top: 2rem;
+}
+
+.backToHomeContainer {
+  text-align: center;
+  margin-top: 30px;
+  margin-bottom: 20px;
+}
+
+.backToHomeBtn {
+  display: inline-block;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 24px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-round);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  font-family: 'Instrument Sans', sans-serif;
+}
+
+@media (min-width: 768px) {
+  .backToHomeBtn {
+    font-size: 16px;
+    padding: 14px 28px;
+  }
+}
+
+.backToHomeBtn:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-brand-primary);
+  background: rgba(255, 51, 51, 0.1);
+  transform: translateY(-2px);
+}
+
+.bottomAooLogo {
+  text-align: center;
+  margin-top: 40px;
+}
+
+.backLink {
+  color: var(--color-brand-primary);
+  text-decoration: none;
+  font-size: 1.1rem;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.backLink:hover {
+  color: var(--color-brand-primary-light);
+}
+
+.pollunitContainer {
+  width: 100%;
+  min-height: 600px;
+  background: transparent;
+  border-radius: var(--radius-lg);
+  margin: 2rem 0;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .pollunitContainer {
+    min-height: 700px;
+    padding: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .musicpollContent {
+    padding: 1rem;
+  }
+  
+  .pageTitle {
+    font-size: 2rem;
+  }
+  
+  .musicGrid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .musicCard {
+    padding: 1.5rem;
+  }
+  
+  .brandingImage {
+    max-width: 250px;
+  }
+}
