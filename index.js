@@ -14,6 +14,7 @@ if (process.env.ENABLE_SENTRY === 'TRUE' || process.env.ENABLE_SENTRY === 'true'
   Sentry.init({ 
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV || 'development',
+    release: 'shopify-service@1.0.0',
     
     // Performance Monitoring
     tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1,
@@ -21,10 +22,8 @@ if (process.env.ENABLE_SENTRY === 'TRUE' || process.env.ENABLE_SENTRY === 'true'
     
     // Enhanced integrations for better error tracking and breadcrumbs
     integrations: [
-      new Sentry.Integrations.Http({ tracing: true, breadcrumbs: true }),
-      new Sentry.Integrations.Console(),
-      new Sentry.Integrations.OnUncaughtException(),
-      new Sentry.Integrations.OnUnhandledRejection(),
+      Sentry.httpIntegration({ tracing: true, breadcrumbs: true }),
+      Sentry.expressIntegration(),
     ],
     
     // Dynamic sampling - always capture slow transactions
@@ -52,10 +51,15 @@ if (process.env.ENABLE_SENTRY === 'TRUE' || process.env.ENABLE_SENTRY === 'true'
       return event;
     },
     
-    enableLogs: true,
   });
-  
-  console.log('✓ Sentry monitoring enabled for shopify-service');
+}
+
+// Initialize logger AFTER Sentry, passing the Sentry instance
+const createLogger = require('./logger');
+const logger = createLogger({ Sentry });
+
+if (Sentry) {
+  logger.info('✓ Sentry monitoring enabled for shopify-service');
 }
 
 // Import models first to ensure they're registered with Sequelize
@@ -91,8 +95,62 @@ app.use(morgan('dev', {
 app.use(performanceLogger({
   excludePaths: ['/health', '/api-docs'],
   slowThreshold: 1000,
-  sentryEnabled: !!Sentry
+  sentryEnabled: !!Sentry,
+  winstonLogger: logger
 }));
+
+// Response logging middleware - systematically logs all 4xx/5xx responses
+app.use((req, res, next) => {
+  const originalSend = res.send;
+  const originalJson = res.json;
+  
+  let responseBody = null;
+  
+  res.send = function(data) {
+    responseBody = data;
+    return originalSend.call(this, data);
+  };
+  
+  res.json = function(data) {
+    responseBody = data;
+    return originalJson.call(this, data);
+  };
+  
+  res.on('finish', () => {
+    const statusCode = res.statusCode;
+    
+    // Log warnings for 4xx client errors
+    if (statusCode >= 400 && statusCode < 500) {
+      logger.warn(`Client error response: ${req.method} ${req.originalUrl || req.url}`, {
+        statusCode,
+        method: req.method,
+        url: req.originalUrl || req.url,
+        userAgent: req.get('user-agent'),
+        ip: req.ip,
+        responseBody: typeof responseBody === 'string' ? responseBody.substring(0, 500) : responseBody,
+        query: req.query,
+        params: req.params
+      });
+    }
+    
+    // Log errors for 5xx server errors
+    if (statusCode >= 500) {
+      logger.error(`Server error response: ${req.method} ${req.originalUrl || req.url}`, {
+        statusCode,
+        method: req.method,
+        url: req.originalUrl || req.url,
+        userAgent: req.get('user-agent'),
+        ip: req.ip,
+        responseBody: typeof responseBody === 'string' ? responseBody.substring(0, 500) : responseBody,
+        query: req.query,
+        params: req.params,
+        body: req.body
+      });
+    }
+  });
+  
+  next();
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -127,10 +185,26 @@ if (Sentry) {
 
 // Error handling middleware (must be after Sentry error handler)
 app.use((err, req, res, next) => {
-    console.error('Error:', err.message);
-    console.error('Stack:', err.stack);
+    const statusCode = err.statusCode || err.status || 500;
     
-    const statusCode = err.statusCode || 500;
+    // Log the full error object to capture all properties (Sequelize errors, etc.)
+    logger.error(err.message || 'Error occurred', {
+        error: err,
+        message: err.message,
+        stack: err.stack,
+        statusCode,
+        method: req.method,
+        url: req.originalUrl || req.url,
+        query: req.query,
+        params: req.params,
+        body: req.body,
+        // Sequelize/Database error properties
+        sql: err.sql,
+        parameters: err.parameters,
+        parent: err.parent,
+        original: err.original,
+    });
+    
     res.status(statusCode).json({
         error: err.message || 'Internal server error',
         ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
