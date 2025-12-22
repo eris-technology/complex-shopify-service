@@ -72,12 +72,16 @@ const createLogger = (options = {}) => {
     logger.warn = function(message, meta = {}) {
       originalWarn(message, meta);
       
-      // Send warning to Sentry
-      Sentry.withScope((scope) => {
-        scope.setLevel('warning');
-        scope.setContext('metadata', meta);
-        Sentry.captureMessage(message || 'Warning', 'warning');
-      });
+      // Send warning to Sentry (wrapped in try-catch for safety)
+      try {
+        Sentry.withScope((scope) => {
+          scope.setLevel('warning');
+          scope.setContext('metadata', meta);
+          Sentry.captureMessage(message || 'Warning', 'warning');
+        });
+      } catch (err) {
+        // Silently fail - Sentry is not critical to application functionality
+      }
     };
 
     logger.error = function(message, meta = {}) {
@@ -87,60 +91,65 @@ const createLogger = (options = {}) => {
         return;
       }
       
-      // Send error to Sentry
-      Sentry.withScope((scope) => {
-        scope.setLevel('error');
-        
-        // Handle complex error objects (Sequelize, Postgres, etc.)
-        let errorToCapture = null;
-        
-        // Check if message itself is an Error object
-        if (message instanceof Error) {
-          errorToCapture = message;
-          // Add metadata as extra context
-          Object.keys(meta).forEach(key => {
-            scope.setExtra(key, meta[key]);
-          });
-        }
-        // Check if meta contains error/stack/original properties
-        else if (meta.error || meta.stack || meta.original || meta.parent) {
-          // Reconstruct or use existing error
-          if (meta.error instanceof Error) {
-            errorToCapture = meta.error;
-          } else {
-            errorToCapture = new Error(message || meta.message || 'Error');
-            if (meta.stack) errorToCapture.stack = meta.stack;
-          }
+      // Send error to Sentry (wrapped in try-catch for safety)
+      try {
+        Sentry.withScope((scope) => {
+          scope.setLevel('error');
           
-          // Add all metadata as extras for Sequelize errors
-          Object.keys(meta).forEach(key => {
-            if (key !== 'error' && key !== 'stack') {
+          // Handle complex error objects (Sequelize, Postgres, etc.)
+          let errorToCapture = null;
+          
+          // Check if message itself is an Error object
+          if (message instanceof Error) {
+            errorToCapture = message;
+            // Add metadata as extra context
+            Object.keys(meta).forEach(key => {
               scope.setExtra(key, meta[key]);
-            }
-          });
-          
-          // Special handling for database errors
-          if (meta.sql) {
-            scope.setContext('sql', {
-              query: meta.sql,
-              parameters: meta.parameters,
-              code: meta.code,
-              detail: meta.detail,
-              hint: meta.hint
             });
           }
-        } else {
-          // Simple message or metadata
-          scope.setContext('metadata', meta);
-        }
-        
-        // Capture to Sentry
-        if (errorToCapture) {
-          Sentry.captureException(errorToCapture);
-        } else {
-          Sentry.captureMessage(message || 'Error', 'error');
-        }
-      });
+          // Check if meta contains error/stack/original properties
+          else if (meta.error || meta.stack || meta.original || meta.parent) {
+            // Reconstruct or use existing error
+            if (meta.error instanceof Error) {
+              errorToCapture = meta.error;
+            } else {
+              errorToCapture = new Error(message || meta.message || 'Error');
+              if (meta.stack) errorToCapture.stack = meta.stack;
+            }
+            
+            // Add all metadata as extras for Sequelize errors
+            Object.keys(meta).forEach(key => {
+              if (key !== 'error' && key !== 'stack') {
+                scope.setExtra(key, meta[key]);
+              }
+            });
+            
+            // Special handling for database errors
+            if (meta.sql) {
+              scope.setContext('sql', {
+                query: meta.sql,
+                parameters: meta.parameters,
+                code: meta.code,
+                detail: meta.detail,
+                hint: meta.hint
+              });
+            }
+          } else {
+            // Simple message or metadata
+            scope.setContext('metadata', meta);
+          }
+          
+          // Capture to Sentry
+          if (errorToCapture) {
+            Sentry.captureException(errorToCapture);
+          } else {
+            Sentry.captureMessage(message || 'Error', 'error');
+          }
+        });
+      } catch (err) {
+        // Silently fail - Sentry is not critical to application functionality
+        // Error is already logged to Winston above
+      }
     };
   }
 

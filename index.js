@@ -9,45 +9,56 @@ require('dotenv').config();
 // Sentry initialization - MUST be first, before any other requires
 let Sentry;
 if (process.env.ENABLE_SENTRY === 'TRUE' || process.env.ENABLE_SENTRY === 'true') {
-  Sentry = require("@sentry/node");
-  
-  Sentry.init({ 
-    dsn: process.env.SENTRY_DSN,
-    environment: process.env.NODE_ENV || 'development',
-    release: 'shopify-service@1.0.0',
+  try {
+    Sentry = require("@sentry/node");
     
-    // Performance Monitoring
-    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1,
-    profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE) || 0.1,
+    Sentry.init({ 
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.NODE_ENV || 'development',
+      release: 'shopify-service@1.0.0',
+      
+      // Performance Monitoring
+      tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1,
+      profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE) || 0.1,
+      
+      // Enhanced integrations for better error tracking and breadcrumbs
+      integrations: [
+        Sentry.httpIntegration({ tracing: true, breadcrumbs: true }),
+        Sentry.expressIntegration(),
+      ],
+      
+      // Dynamic sampling - always capture slow transactions
+      tracesSampler: (samplingContext) => {
+        const parentSampled = samplingContext.parentSampled;
+        if (parentSampled !== undefined) {
+          return parentSampled;
+        }
+        return parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1;
+      },
+      
+      // Enrich error events with service metadata - this sets the Issue title
+      beforeSend(event, hint) {
+        // Set server_name which appears in Sentry Issues
+        event.server_name = 'shopify-service';
+        event.tags = { ...event.tags, service: 'shopify-service' };
+        return event;
+      },
+      
+      beforeSendTransaction(event) {
+        const duration = (event.timestamp - event.start_timestamp) * 1000; // Convert to ms
+        if (duration > 1000) {
+          event.tags = { ...event.tags, slow_transaction: 'true' };
+        }
+        return event;
+      },
+    });
     
-    // Enhanced integrations for better error tracking and breadcrumbs
-    integrations: [
-      Sentry.httpIntegration({ tracing: true, breadcrumbs: true }),
-      Sentry.expressIntegration(),
-    ],
-    
-    // Dynamic sampling - always capture slow transactions
-    tracesSampler: (samplingContext) => {
-      const parentSampled = samplingContext.parentSampled;
-      if (parentSampled !== undefined) {
-        return parentSampled;
-      }
-      return parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.1;
-    },
-    
-    // Enrich error events with service metadata - this sets the Issue title
-    beforeSend(event, hint) {
-      // Set server_name which appears in Sentry Issues
-      event.server_name = 'shopify-service';
-      event.tags = { ...event.tags, service: 'shopify-service' };
-      return event;
-    },
-    
-    beforeSendTransaction(event) {
-      const duration = (event.timestamp - event.start_timestamp) * 1000; // Convert to ms
-      if (duration > 1000) {
-        event.tags = { ...event.tags, slow_transaction: 'true' };
-      }
+    console.log('✓ Sentry monitoring enabled for shopify-service');
+  } catch (err) {
+    console.error('⚠ Sentry initialization failed - continuing without error monitoring:', err.message);
+    Sentry = null;
+  }
+}
       return event;
     },
     
