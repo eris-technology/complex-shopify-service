@@ -24,7 +24,7 @@ async function fetchProducts(options = {}) {
     const apiVersion = process.env.SHOPIFY_API_VERSION || '2024-01';
 
     if (!shopDomain || !accessToken) {
-        throw new Error('Shopify credentials not configured (SHOPIFY_SHOP_DOMAIN, SHOPIFY_ACCESS_TOKEN)');
+        throw new Error('Shopify credentials not configured');
     }
 
     // Check cache first
@@ -32,74 +32,164 @@ async function fetchProducts(options = {}) {
     const cached = await getCachedData(cacheKey);
     
     if (cached) {
+        console.log(`🚀 Returning cached products (key: ${cacheKey})`);
         return cached;
     }
 
-    // Build GraphQL query
-    let collectionFilter = '';
+    let query;
+    let variables = { limit };
+    if (after) variables.after = after;
+
     if (collection) {
-        collectionFilter = `, query: "collection:${collection}"`;
-    }
-
-    let afterClause = '';
-    if (after) {
-        afterClause = `, after: "${after}"`;
-    }
-
-    const query = `#graphql
-        query GetProducts {
-            products(first: ${limit}${collectionFilter}${afterClause}) {
-                edges {
-                    node {
-                        id
-                        title
-                        handle
-                        description
-                        tags
-                        productType
-                        vendor
-                        status
-                        images(first: 5) {
-                            edges {
-                                node {
-                                    url
-                                    altText
+        console.log(`🔍 Querying specific collection: "${collection}"`);
+        
+        variables.handle = collection;
+        
+        query = `#graphql
+            query GetCollectionProducts($handle: String!, $limit: Int!, $after: String) {
+                collectionByHandle(handle: $handle) {
+                    products(first: $limit, after: $after) {
+                        edges {
+                            node {
+                                id
+                                title
+                                handle
+                                description
+                                tags
+                                productType
+                                vendor
+                                status
+                                images(first: 5) {
+                                    edges {
+                                        node {
+                                            url
+                                            altText
+                                        }
+                                    }
+                                }
+                                variants(first: 50) {
+                                    edges {
+                                        node {
+                                            id
+                                            title
+                                            sku
+                                            barcode
+                                            price
+                                            compareAtPrice
+                                            availableForSale
+                                            inventoryQuantity
+                                            image {
+                                                url
+                                                altText
+                                            }
+                                            metafields(first: 5) {
+                                                edges {
+                                                    node {
+                                                        key
+                                                        value
+                                                        namespace
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                metafields(first: 5) {
+                                    edges {
+                                        node {
+                                            key
+                                            value
+                                            namespace
+                                        }
+                                    }
                                 }
                             }
+                            cursor
                         }
-                        variants(first: 50) {
-                            edges {
-                                node {
-                                    id
-                                    title
-                                    sku
-                                    barcode
-                                    price
-                                    compareAtPrice
-                                    availableForSale
-                                    inventoryQuantity
-                                    image {
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                    }
+                }
+            }
+        `;
+    } else {
+        console.log(`🔍 Querying ALL products`);
+        
+        query = `#graphql
+            query GetAllProducts($limit: Int!, $after: String) {
+                products(first: $limit, after: $after) {
+                    edges {
+                        node {
+                            id
+                            title
+                            handle
+                            description
+                            tags
+                            productType
+                            vendor
+                            status
+                            images(first: 5) {
+                                edges {
+                                    node {
                                         url
                                         altText
                                     }
                                 }
                             }
+                            variants(first: 50) {
+                                edges {
+                                    node {
+                                        id
+                                        title
+                                        sku
+                                        barcode
+                                        price
+                                        compareAtPrice
+                                        availableForSale
+                                        inventoryQuantity
+                                        image {
+                                            url
+                                            altText
+                                        }
+                                        metafields(first: 5) {
+                                            edges {
+                                                node {
+                                                    key
+                                                    value
+                                                    namespace
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            metafields(first: 5) {
+                                edges {
+                                    node {
+                                        key
+                                        value
+                                        namespace
+                                    }
+                                }
+                            }
                         }
+                        cursor
                     }
-                    cursor
-                }
-                pageInfo {
-                    hasNextPage
-                    endCursor
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
                 }
             }
-        }
-    `;
+        `;
+    }
 
     try {
         const response = await axios.post(
             `https://${shopDomain}/admin/api/${apiVersion}/graphql.json`,
-            { query },
+            { query, variables },
             {
                 headers: {
                     'Content-Type': 'application/json',
@@ -109,20 +199,31 @@ async function fetchProducts(options = {}) {
         );
 
         if (response.data.errors) {
-            console.error('Shopify GraphQL errors:', response.data.errors);
-            throw new Error(`Shopify API error: ${response.data.errors[0].message}`);
+            console.error('Shopify GraphQL errors:', JSON.stringify(response.data.errors, null, 2));
+            throw new Error(`Shopify API error`);
+        }
+
+        let productsData;
+        if (collection) {
+            if (!response.data.data.collectionByHandle) {
+                console.warn(`Collection "${collection}" not found in Shopify!`);
+                productsData = { edges: [], pageInfo: { hasNextPage: false } };
+            } else {
+                productsData = response.data.data.collectionByHandle.products;
+            }
+        } else {
+            productsData = response.data.data.products;
         }
 
         const result = {
-            products: response.data.data.products.edges,
-            pageInfo: response.data.data.products.pageInfo
+            products: productsData.edges,
+            pageInfo: productsData.pageInfo
         };
 
-        // Cache the result (30-60 seconds depending on location filtering)
-        const cacheTTL = locations ? 30 : 60;
-        await setCachedData(cacheKey, result, cacheTTL);
+        // Cache the result (60s)
+        await setCachedData(cacheKey, result, 60);
 
-        console.log(`📦 Fetched ${result.products.length} products from Shopify (cached for ${cacheTTL}s)`);
+        console.log(`📦 Fetched ${result.products.length} products for collection: ${collection || 'ALL'}`);
 
         return result;
 
@@ -225,7 +326,62 @@ async function fetchProduct(productId) {
     }
 }
 
+async function fetchCollectionsDetails(handles) {
+    if (!handles || handles.length === 0) {
+        return [];
+    }
+
+    const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+    const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+    const apiVersion = process.env.SHOPIFY_API_VERSION || '2024-01';
+
+    const query = `#graphql
+      query GetCollections {
+        ${handles.map((handle, index) => `
+          collection${index}: collectionByHandle(handle: "${handle}") {
+            id
+            title
+            handle
+            description
+            image {
+              url
+              altText
+            }
+          }
+        `).join('\n')}
+      }
+    `;
+
+    try {
+        const response = await axios.post(
+            `https://${shopDomain}/admin/api/${apiVersion}/graphql.json`,
+            { query },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Shopify-Access-Token': accessToken
+                }
+            }
+        );
+
+        if (response.data.errors) {
+            console.error('Shopify GraphQL errors:', response.data.errors);
+            return [];
+        }
+
+        const collections = Object.values(response.data.data)
+            .filter(item => item !== null);
+
+        return collections;
+
+    } catch (error) {
+        console.error('Error fetching collections details:', error.message);
+        throw error;
+    }
+}
+
 module.exports = {
     fetchProducts,
-    fetchProduct
+    fetchProduct,
+    fetchCollectionsDetails
 };
