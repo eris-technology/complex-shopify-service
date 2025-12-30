@@ -58,6 +58,18 @@
           "value": "redis"
         },
         {
+          "name": "ENABLE_SENTRY",
+          "value": "true"
+        },
+        {
+          "name": "SENTRY_TRACES_SAMPLE_RATE",
+          "value": "0.1"
+        },
+        {
+          "name": "SENTRY_PROFILES_SAMPLE_RATE",
+          "value": "0.1"
+        },
+        {
           "name": "REDIS_URL",
           "value": "redis://master.complex-redis-ci.irrslj.ape1.cache.amazonaws.com:6379"
         },

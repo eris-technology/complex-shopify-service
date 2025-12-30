@@ -6,12 +6,14 @@ const wishlistRoutes = require('./wishlist.routes');
 const posRoutes = require('./pos.routes');
 const mobileRoutes = require('./mobile.routes');
 const productsRoutes = require('./products.routes');
+const collectionRoutes = require('./collections.routes')
 
 // Register routes
 router.use('/wishlists', wishlistRoutes); // General wishlist operations
 router.use('/pos', posRoutes); // POS extension specific endpoints
 router.use('/mobile', mobileRoutes); // Mobile app specific endpoints
 router.use('/products', productsRoutes); // Product catalog endpoints
+router.use('/collections', collectionRoutes); // collections catalog endpoints
 
 // Default API route
 router.get('/', (req, res) => {
@@ -25,7 +27,8 @@ router.get('/', (req, res) => {
             products: '/api/products',
             wishlists: '/api/wishlists',
             pos: '/api/pos',
-            mobile: '/api/mobile'
+            mobile: '/api/mobile',
+            collection: 'api/collections'
         }
     });
 });
